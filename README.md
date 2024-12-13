@@ -46,18 +46,6 @@ This project is a **Smart Notice Board** system developed using PHP, MySQL, and 
 4. **MicroSD Card**: Add support for data storage using a MicroSD card.
 5. **Hosting**: Deploy the application on a web hosting platform for remote access.
 
-## Project Structure
-
-```
-Project_Folder
-|
-├── server.php        # Main logic for displaying and updating notices
-├── index.php         # Web interface for managing notices
-├── assets/           # CSS, JS, and image assets
-├── database.sql      # MySQL database schema and sample data
-└── arduino_code/     # Arduino sketch for ESP8266
-```
-
 ## Usage
 
 1. Open the web interface to add, update, or delete notices.
