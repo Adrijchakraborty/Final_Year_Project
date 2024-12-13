@@ -14,7 +14,9 @@ if ($conn->connect_error) {
 
 // Fetch latest notices as JSON
 if (isset($_GET['latest'])) {
-    $sql = "SELECT content, importance_level FROM notices ORDER BY created_at DESC";
+    $sql = "SELECT content, importance_level 
+FROM notices 
+ORDER BY importance_level DESC, created_at DESC";
     $result = $conn->query($sql);
 
     $notices = [];
@@ -57,7 +59,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 // Fetch notices for HTML rendering
-$sql = "SELECT content, importance_level FROM notices ORDER BY created_at DESC";
+$sql = "SELECT content, importance_level 
+FROM notices 
+ORDER BY importance_level DESC, created_at DESC";
 $result = $conn->query($sql);
 
 $notices = [];
