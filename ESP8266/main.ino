@@ -14,6 +14,8 @@ const char* serverUrl = "http://192.168.0.120/Smart%20Notice%20Board(FYP)/server
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+const int potPin = A0;
+
 // WiFi client
 WiFiClient wifiClient;
 
@@ -40,9 +42,14 @@ void setup() {
     Serial.print(".");
   }
   Serial.println("\nConnected to WiFi");
+
   display.clearDisplay();
-  display.println("Connected to WiFi");
+  display.setCursor(0, 0);
+  display.println("Connected to:");
+  display.setCursor(0, 10);
+  display.println(WiFi.SSID()); // Display the connected WiFi SSID
   display.display();
+  delay(1000);
 }
 
 void loop() {
@@ -55,38 +62,33 @@ void loop() {
       String response = http.getString();
       
       // Parse JSON response
-      StaticJsonDocument<1024> doc;
+      DynamicJsonDocument doc(1024);
       DeserializationError error = deserializeJson(doc, response);
 
       if (!error) {
-        String highestPriorityNotice;
-        int maxImportance = -1;
+        // Read the potentiometer value
+        int potValue = analogRead(potPin);
+        int maxNotices = doc.size(); // Total number of notices
+        int startNoticeIndex = map(potValue, 0, 1023, 0, maxNotices - 3); // Adjust range
+        startNoticeIndex = constrain(startNoticeIndex, 0, maxNotices - 3); // Ensure valid range
 
-        // Find the notice with the highest importance
-        for (JsonObject notice : doc.as<JsonArray>()) {
+        // Display notices based on the potentiometer value
+        display.clearDisplay();
+        display.setCursor(0, 0);
+        display.println("Notices:");
+
+        int yPosition = 10; // Start below the header (y=10)
+        for (int i = startNoticeIndex; i < startNoticeIndex + 5 && i < maxNotices; i++) {
+          JsonObject notice = doc[i];
           String content = notice["content"];
-          int importance = notice["importance_level"];
-          if (importance > maxImportance) {
-            maxImportance = importance;
-            highestPriorityNotice = content;
-          }
+
+          display.setCursor(0, yPosition); // Set cursor for each notice
+          display.print("> ");         // Display a bullet point
+          display.print(content);
+          yPosition += 10;                // Move down for the next line
         }
 
-        // Display the highest priority notice
-        if (maxImportance != -1) {
-          display.clearDisplay();
-          display.setCursor(0, 0);
-          display.println("Notice:");
-          display.println(highestPriorityNotice);
-          display.display();
-
-          Serial.println("Highest Priority Notice:");
-          Serial.println(highestPriorityNotice);
-          Serial.print("Importance: ");
-          Serial.println(maxImportance);
-        } else {
-          Serial.println("No notices available.");
-        }
+        display.display();
       } else {
         Serial.print("JSON Parse Error: ");
         Serial.println(error.c_str());
@@ -105,5 +107,5 @@ void loop() {
     display.display();
   }
 
-  delay(2500); // Wait 2.5 seconds before the next request
+  delay(250); // Reduce delay for smoother scrolling
 }
