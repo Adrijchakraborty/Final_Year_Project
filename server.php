@@ -59,7 +59,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 // Fetch notices for HTML rendering
-$sql = "SELECT content, importance_level 
+$sql = "SELECT id, content, importance_level 
 FROM notices 
 ORDER BY importance_level DESC, created_at DESC";
 $result = $conn->query($sql);
@@ -70,6 +70,23 @@ if ($result->num_rows > 0) {
         $notices[] = $row;
     }
 }
+
+// Handle deletion
+if (isset($_GET['delete'])) {
+    $idToDelete = intval($_GET['delete']);
+    $deleteSql = "DELETE FROM notices WHERE id = ?";
+    $stmt = $conn->prepare($deleteSql);
+    $stmt->bind_param("i", $idToDelete);
+
+    if ($stmt->execute()) {
+        $message = "Notice deleted successfully!";
+    } else {
+        $error = "Delete failed: " . $stmt->error;
+    }
+
+    $stmt->close();
+}
+
 
 $conn->close();
 ?>
@@ -91,11 +108,12 @@ $conn->close();
     <section id="display">
         <?php if (count($notices) > 0): ?>
             <?php foreach ($notices as $notice): ?>
-                <div>
-                    <p><?php echo htmlspecialchars($notice['content']); ?></p>
-                    <small>Importance: <?php echo htmlspecialchars($notice['importance_level']); ?></small>
-                </div>
-            <?php endforeach; ?>
+    <div>
+        <p><?php echo htmlspecialchars($notice['content']); ?></p>
+        <small>Importance: <?php echo htmlspecialchars($notice['importance_level']); ?></small><br>
+        <a href="?delete=<?php echo $notice['id']; ?>" onclick="return confirm('Are you sure you want to delete this notice?');">Delete</a>
+    </div>
+<?php endforeach; ?>
         <?php else: ?>
             <p>No notices available.</p>
         <?php endif; ?>

@@ -2,17 +2,17 @@
 #include <ESP8266HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_SH110X.h>
 
 // WiFi credentials
-const char* ssid = "Adi(2.4GHz)";
-const char* password = "nonetwork@129";
-const char* serverUrl = "http://192.168.0.120/Smart%20Notice%20Board(FYP)/server.php?latest";
+const char* ssid = "Ap";
+const char* password = "anishpatel";
+const char* serverUrl = "http://192.168.234.153/Final_Year_Project_Demo-main/server.php?latest";
 
 // OLED display settings
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);  // SH1106G constructor
 
 const int potPin = A0;
 
@@ -21,15 +21,16 @@ WiFiClient wifiClient;
 
 void setup() {
   Serial.begin(115200);
-  
+
   // Initialize OLED display
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println("SSD1306 allocation failed");
-    for (;;);
+  if (!display.begin(0x3C, true)) {
+    Serial.println("Display allocation failed");
+    while (true);  // halt
   }
+
   display.clearDisplay();
   display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
+  display.setTextColor(SH110X_WHITE);
   display.setCursor(0, 0);
   display.println("Connecting to WiFi...");
   display.display();
@@ -47,9 +48,9 @@ void setup() {
   display.setCursor(0, 0);
   display.println("Connected to:");
   display.setCursor(0, 10);
-  display.println(WiFi.SSID()); // Display the connected WiFi SSID
+  display.println(WiFi.SSID());
   display.display();
-  delay(1000);
+  delay(1500);
 }
 
 void loop() {
@@ -60,32 +61,32 @@ void loop() {
 
     if (httpResponseCode > 0) {
       String response = http.getString();
-      
+
       // Parse JSON response
-      DynamicJsonDocument doc(1024);
+      DynamicJsonDocument doc(2048);  // Increased buffer
       DeserializationError error = deserializeJson(doc, response);
 
       if (!error) {
-        // Read the potentiometer value
+        // Read potentiometer value
         int potValue = analogRead(potPin);
-        int maxNotices = doc.size(); // Total number of notices
-        int startNoticeIndex = map(potValue, 0, 1023, 0, maxNotices - 3); // Adjust range
-        startNoticeIndex = constrain(startNoticeIndex, 0, maxNotices - 3); // Ensure valid range
+        int maxNotices = doc.size();
+        int startNoticeIndex = map(potValue, 0, 1023, 0, maxNotices - 3);
+        startNoticeIndex = constrain(startNoticeIndex, 0, maxNotices - 3);
 
-        // Display notices based on the potentiometer value
+        // Display notices
         display.clearDisplay();
         display.setCursor(0, 0);
         display.println("Notices:");
 
-        int yPosition = 10; // Start below the header (y=10)
+        int yPosition = 10;
         for (int i = startNoticeIndex; i < startNoticeIndex + 5 && i < maxNotices; i++) {
           JsonObject notice = doc[i];
-          String content = notice["content"];
+          String content = notice["content"].as<String>();
 
-          display.setCursor(0, yPosition); // Set cursor for each notice
-          display.print("> ");         // Display a bullet point
+          display.setCursor(0, yPosition);
+          display.print("> ");
           display.print(content);
-          yPosition += 10;                // Move down for the next line
+          yPosition += 10;
         }
 
         display.display();
@@ -94,7 +95,7 @@ void loop() {
         Serial.println(error.c_str());
       }
     } else {
-      Serial.print("Error on HTTP request: ");
+      Serial.print("HTTP Request Failed: ");
       Serial.println(httpResponseCode);
     }
 
@@ -107,5 +108,5 @@ void loop() {
     display.display();
   }
 
-  delay(250); // Reduce delay for smoother scrolling
+  delay(250);  // Smooth scrolling
 }
