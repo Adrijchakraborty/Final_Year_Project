@@ -1,4 +1,10 @@
 <?php
+
+session_start();
+if (!isset($_SESSION['username'])) {
+    header("Location: login.html"); // Redirect to login page if not logged in
+    exit;
+}
 // Database connection
 $host = "localhost";
 $username = "root";
@@ -97,12 +103,56 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="style.css">
+    <style>
+        nav {
+            background-color: #00bcd4; /* Light aqua */
+            padding: 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        }
+
+        nav h1 {
+            margin: 0;
+            font-size: 32px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .nav-user {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-user h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .logout {
+            text-decoration: none;
+            color: white;
+            background-color: #e63946;
+            padding: 8px 16px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+    </style>
     <title>Smart Notice Board</title>
 </head>
 <body>
     <nav>
         <h1 class="font-inter">Smart Notice Board</h1>
+        <div class="nav-user">
+            <h2>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?></h2>
+            <a class="logout" href="logout.php">Logout</a>
+        </div>
     </nav>
+
 
     <!-- Display Section -->
     <section id="display">
