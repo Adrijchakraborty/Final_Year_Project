@@ -1,10 +1,6 @@
 <?php
 
-session_start();
-if (!isset($_SESSION['username'])) {
-    header("Location: login.html"); // Redirect to login page if not logged in
-    exit;
-}
+
 // Database connection
 $host = "localhost";
 $username = "root";
@@ -35,6 +31,12 @@ ORDER BY importance_level DESC, created_at DESC";
     // Set response header to JSON
     header('Content-Type: application/json');
     echo json_encode($notices, JSON_PRETTY_PRINT);
+    exit;
+}
+
+session_start();
+if (!isset($_SESSION['username'])) {
+    header("Location: login.html"); // Redirect to login page if not logged in
     exit;
 }
 
