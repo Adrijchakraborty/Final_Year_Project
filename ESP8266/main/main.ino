@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SH110X.h>
+#include <qrcode.h>
 
 // WiFi credentials
 const char* ssid = "CallMeDean🔥";
@@ -18,7 +19,13 @@ const int potPin = A0;
 
 WiFiClient wifiClient;
 
-// Word-wrap function
+// Display timing
+const unsigned long DISPLAY_INTERVAL = 5000; // 5 seconds per mode
+unsigned long lastModeSwitch = 0;
+bool showQR = false;
+int currentNoticeIndex = -1;
+String currentUrl = "";
+
 void printWrappedText(String text, int x, int& y, int maxWidth) {
   int len = text.length();
   String line = "";
@@ -46,26 +53,48 @@ void printWrappedText(String text, int x, int& y, int maxWidth) {
   }
 }
 
-int getWrappedHeight(String text, int maxWidth) {
-  int lineCount = 1;
-  String line = "";
+void displayQRCode() {
+  // Generate QR code (version 3 = 29x29 modules)
+  QRCode qrcode;
+  uint8_t qrcodeData[qrcode_getBufferSize(3)];
+  qrcode_initText(&qrcode, qrcodeData, 3, 0, currentUrl.c_str());
 
-  for (int i = 0; i < text.length(); i++) {
-    line += text[i];
-
-    int16_t x1, y1;
-    uint16_t w, h;
-    display.getTextBounds(line, 0, 0, &x1, &y1, &w, &h);
-
-    if (w > maxWidth || text[i] == '\n') {
-      line = text[i];  // start new line
-      lineCount++;
+  // Calculate positioning
+  const int scale = 2;
+  const int qrSize = qrcode.size * scale;
+  const int xPos = (SCREEN_WIDTH - qrSize) / 2;
+  const int yPos = (SCREEN_HEIGHT - qrSize) / 2;
+  
+  // Draw QR code
+  display.clearDisplay();
+  
+  for (uint8_t y = 0; y < qrcode.size; y++) {
+    for (uint8_t x = 0; x < qrcode.size; x++) {
+      if (qrcode_getModule(&qrcode, x, y)) {
+        display.fillRect(
+          xPos + x * scale, 
+          yPos + y * scale,
+          scale, 
+          scale, 
+          SH110X_WHITE
+        );
+      }
     }
   }
-  return lineCount * 10;  // each line ~10px height
 }
 
-
+void displayNoticeContent(String content, int noticeIndex, int maxNotices) {
+  display.clearDisplay();
+  int yPosition = 0;
+  display.setCursor(0, yPosition);
+  display.print("Notice ");
+  display.print(noticeIndex + 1);
+  display.print("/");
+  display.println(maxNotices);
+  yPosition += 10;
+  
+  printWrappedText(content, 0, yPosition, SCREEN_WIDTH);
+}
 
 void setup() {
   Serial.begin(115200);
@@ -73,8 +102,7 @@ void setup() {
   // Initialize OLED display
   if (!display.begin(0x3C, true)) {
     Serial.println("Display allocation failed");
-    while (true)
-      ;  // halt
+    while (true);
   }
 
   display.clearDisplay();
@@ -84,7 +112,7 @@ void setup() {
   display.println("Connecting to WiFi...");
   display.display();
 
-  // Connect to WiFi with timeout
+  // Connect to WiFi
   WiFi.begin(ssid, password);
   Serial.print("Connecting to WiFi");
   int retries = 0;
@@ -100,12 +128,10 @@ void setup() {
     display.setCursor(0, 0);
     display.println("WiFi Failed!");
     display.display();
-    while (true)
-      ;  // halt
+    while (true);
   }
 
   Serial.println("\nConnected to WiFi");
-
   display.clearDisplay();
   display.setCursor(0, 0);
   display.println("Connected to:");
@@ -123,55 +149,49 @@ void loop() {
 
     if (httpResponseCode > 0) {
       String response = http.getString();
-
-      // Debug raw response
-      Serial.println("Raw response:");
-      Serial.println(response);
-
-      // Parse JSON response
       DynamicJsonDocument doc(2048);
       DeserializationError error = deserializeJson(doc, response);
 
       if (!error) {
         int maxNotices = doc.size();
         int potValue = analogRead(potPin);
-        int startNoticeIndex = map(potValue, 0, 1023, 0, max(1, maxNotices - 1));
-        startNoticeIndex = constrain(startNoticeIndex, 0, max(0, maxNotices - 1));
+        int newNoticeIndex = map(potValue, 0, 1023, 0, max(0, maxNotices - 1));
+        newNoticeIndex = constrain(newNoticeIndex, 0, max(0, maxNotices - 1));
 
-        // Display notices
-        display.clearDisplay();
-        display.setCursor(0, 0);
-        display.println("Notices:");
-        int yPosition = 10;
-
-        // Dynamically fit notices based on screen height
-        for (int i = startNoticeIndex; i < maxNotices; i++) {
-          JsonObject notice = doc[i];
+        if (maxNotices > 0) {
+          JsonObject notice = doc[newNoticeIndex];
           String content = notice["content"].as<String>();
+          bool hasUrl = notice.containsKey("url") && !notice["url"].isNull() && notice["url"].as<String>().length() > 0;
+          String newUrl = hasUrl ? notice["url"].as<String>() : "";
 
-          int noticeHeight = getWrappedHeight(content, 118) + 10;  // '>' line + wrapped text
-
-          if (yPosition + noticeHeight > SCREEN_HEIGHT) {
-            break;  // Stop if it won't fit
+          // Check if notice changed
+          if (newNoticeIndex != currentNoticeIndex || newUrl != currentUrl) {
+            currentNoticeIndex = newNoticeIndex;
+            currentUrl = newUrl;
+            showQR = false; // Reset to content view when notice changes
+            lastModeSwitch = millis();
           }
 
-          display.setCursor(0, yPosition);
-          display.print("> ");
-          yPosition += 10;
+          // Toggle between content and QR every 5s (only if URL exists)
+          if (hasUrl && millis() - lastModeSwitch > DISPLAY_INTERVAL) {
+            showQR = !showQR;
+            lastModeSwitch = millis();
+          }
 
-          printWrappedText(content, 10, yPosition, 118);  // 118 leaves margin
+          // Display appropriate screen
+          if (showQR && hasUrl && currentUrl.length() > 0) {
+            displayQRCode();
+          } else {
+            displayNoticeContent(content, currentNoticeIndex, maxNotices);
+          }
+        } else {
+          display.clearDisplay();
+          display.setCursor(0, 0);
+          display.println("No notices found");
         }
         display.display();
-
-      } else {
-        Serial.print("JSON Parse Error: ");
-        Serial.println(error.c_str());
       }
-    } else {
-      Serial.print("HTTP Request Failed: ");
-      Serial.println(httpResponseCode);
     }
-
     http.end();
   } else {
     Serial.println("WiFi Disconnected");
@@ -180,6 +200,5 @@ void loop() {
     display.println("WiFi Disconnected");
     display.display();
   }
-
-  delay(250);  // Smooth refresh
+  delay(100);
 }
