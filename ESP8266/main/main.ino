@@ -6,9 +6,9 @@
 #include <qrcode.h>
 
 // WiFi credentials
-const char* ssid = "CallMeDean🔥";
-const char* password = "123456789";
-const char* serverUrl = "http://192.168.0.105/Smart%20Notice%20Board(FYP)/server.php?latest";
+const char* ssid = "Ap";
+const char* password = "anishpatel";
+const char* serverUrl = "http://192.168.122.236/Smart%20Notice%20Board(FYP)/server.php?latest";
 
 // OLED display settings
 #define SCREEN_WIDTH 128
